@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Resume Analyzer — Frontend Only</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg:#0b1020;
+      --panel:#0f1530;
+      --glass: rgba(255,255,255,0.06);
+      --glass-2: rgba(255,255,255,0.1);
+      --text:#eaf0ff;
+      --muted:#b6c3ff;
+      --brand:#7c9cff;  /* primary */
+      --accent:#52e0ff; /* secondary */
+      --ok:#28d17c;
+      --warn:#ffb020;
+      --bad:#ff5a7a;
+      --shadow: 0 10px 30px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.05);
+      --radius: 18px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; color:var(--text);
+      background:
+        radial-gradient(1200px 800px at 10% -10%, #1b2460 0%, transparent 60%),
+        radial-gradient(900px 900px at 110% 20%, #20356e 0%, transparent 50%),
+        radial-gradient(900px 900px at 50% 120%, #0f2a4a 0%, transparent 50%),
+        var(--bg);
+      background-attachment: fixed;
+    }
+    header{
+      position: sticky; top:0; z-index:5;
+      backdrop-filter: blur(10px);
+      background: linear-gradient(0deg, transparent, rgba(0,0,0,0.25));
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .nav{
+      display:flex; align-items:center; justify-content:space-between; gap:16px;
+      padding:18px clamp(16px,4vw,36px);
+      max-width:1200px; margin:0 auto;
+    }
+    .brand{display:flex; align-items:center; gap:12px; font-weight:800; letter-spacing:0.3px}
+    .brand .logo{
+      width:38px; height:38px; border-radius:12px; display:grid; place-items:center;
+      background: linear-gradient(135deg, var(--brand), var(--accent));
+      box-shadow: var(--shadow);
+      color:#0a1020; font-weight:900;
+    }
+    .actions{display:flex; align-items:center; gap:10px}
+    .btn{
+      appearance:none; border:none; outline:none; cursor:pointer; color:var(--text);
+      background: linear-gradient(180deg, var(--glass-2), var(--glass));
+      border:1px solid rgba(255,255,255,0.08);
+      padding:10px 14px; border-radius:12px; font-weight:600;
+      transition: transform .15s ease, box-shadow .2s ease, background .2s ease;
+      box-shadow: var(--shadow);
+    }
+    .btn:hover{ transform: translateY(-1px); }
+    .btn.primary{
+      background: linear-gradient(135deg, var(--brand), var(--accent));
+      color:#08101f; border:none;
+    }
+
+    .container{ max-width:1200px; margin:24px auto; padding:0 clamp(16px,4vw,36px); }
+
+    .grid{
+      display:grid; grid-template-columns: 1.1fr 1fr; gap:22px;
+    }
+    @media (max-width: 980px){ .grid{ grid-template-columns: 1fr; } }
+
+    .card{
+      background: linear-gradient(180deg, var(--glass-2), var(--glass));
+      border:1px solid rgba(255,255,255,0.08);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow:hidden;
+    }
+    .card .head{ display:flex; align-items:center; justify-content:space-between; padding:18px 18px 6px 18px; }
+    .card .title{ font-size:16px; font-weight:700; color:#ffffff }
+    .card .sub{ color:var(--muted); font-size:13px; }
+    .card .body{ padding:18px; }
+
+    /* Upload */
+    .uploader{
+      display:grid; gap:16px; padding:18px; border-radius:14px; border:2px dashed rgba(255,255,255,0.14);
+      place-items:center; text-align:center;
+      background: rgba(124,156,255,0.06);
+      transition: border-color .2s ease, background .2s ease;
+    }
+    .uploader.drag{ border-color: var(--accent); background: rgba(82,224,255,0.1); }
+    .uploader input{ display:none }
+    .uploader .bigicon{ font-size:42px; line-height:1; }
+    .uploader .name{ color:var(--muted); font-size:14px }
+
+    .toolbar{ display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+
+    /* KPI strip */
+    .kpis{ display:grid; grid-template-columns: repeat(3,1fr); gap:14px; }
+    @media (max-width:680px){ .kpis{ grid-template-columns:1fr; } }
+    .kpi{ display:flex; align-items:center; gap:14px; padding:14px; border-radius:14px; background: rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.08); }
+    .kpi .dot{ width:12px; height:12px; border-radius:50%; background:var(--brand); box-shadow:0 0 0 4px rgba(124,156,255,0.18); }
+    .kpi .val{ font-weight:800; font-size:22px }
+    .kpi .lbl{ font-size:12px; color:var(--muted) }
+
+    /* Score circle */
+    .score-wrap{ display:flex; align-items:center; gap:22px; flex-wrap:wrap; }
+    .ring{ --p:0; width:140px; height:140px; border-radius:50%; display:grid; place-items:center; position:relative; }
+    .ring::before{ content:""; position:absolute; inset:0; border-radius:50%; background:
+      conic-gradient(var(--ok) calc(var(--p)*1%), rgba(255,255,255,0.08) 0);
+      -webkit-mask: radial-gradient(closest-side, transparent 74px, black 76px);
+              mask: radial-gradient(closest-side, transparent 74px, black 76px);
+      filter: drop-shadow(0 8px 16px rgba(0,0,0,0.35));
+    }
+    .ring .inside{ font-size:32px; font-weight:800; }
+    .ring.bad::before{ background:
+      conic-gradient(var(--bad) calc(var(--p)*1%), rgba(255,255,255,0.08) 0); }
+    .ring.warn::before{ background:
+      conic-gradient(var(--warn) calc(var(--p)*1%), rgba(255,255,255,0.08) 0); }
+
+    .legend{ display:grid; gap:10px; }
+    .legend .row{ display:flex; align-items:center; gap:10px; }
+    .badge{ font-size:11px; font-weight:700; letter-spacing:0.4px; padding:6px 10px; border-radius:999px; border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.06) }
+
+    /* Bars */
+    .bars{ display:grid; gap:12px; }
+    .bar{ display:grid; gap:8px; }
+    .bar .top{ display:flex; align-items:center; justify-content:space-between; font-size:14px; }
+    .bar .track{ height:12px; background: rgba(255,255,255,0.08); border-radius:999px; overflow:hidden; }
+    .bar .fill{ width:0%; height:100%; background: linear-gradient(90deg, var(--brand), var(--accent)); border-radius:999px; transition: width 1s ease; }
+
+    /* Lists */
+    .pill{ display:inline-flex; align-items:center; gap:8px; padding:8px 12px; border-radius:999px; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.1); font-size:13px; margin:6px 6px 0 0; }
+    .pill.low{ border-color: rgba(40,209,124,0.3) }
+    .pill.med{ border-color: rgba(255,176,32,0.35) }
+    .pill.high{ border-color: rgba(255,90,122,0.35) }
+
+    .tips{ display:grid; grid-template-columns: repeat(2,1fr); gap:14px; }
+    @media (max-width:860px){ .tips{ grid-template-columns: 1fr; } }
+    .tip{ padding:16px; border-radius:14px; background: rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.08); display:grid; gap:8px; }
+    .tip .tag{ font-size:11px; font-weight:700; letter-spacing:0.5px; opacity:0.9 }
+    .tip .tag.low{ color:var(--ok) }
+    .tip .tag.med{ color:var(--warn) }
+    .tip .tag.high{ color:var(--bad) }
+
+    .footer{ display:flex; justify-content:center; gap:10px; opacity:0.8; font-size:12px; padding:24px; }
+
+    /* subtle animations */
+    .fade-in{ animation: fade .5s ease both }
+    @keyframes fade{ from{opacity:0; transform: translateY(6px)} to{opacity:1; transform:none} }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="nav">
+      <div class="brand">
+        <div class="logo">AI</div>
+        <div>
+          <div style="font-size:16px; font-weight:800;">Resume Analyzer</div>
+          <div style="font-size:12px; color:var(--muted);">Frontend-Only • Demo UI</div>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn" id="toggleTheme" title="Toggle Appearance">Toggle Theme</button>
+        <button class="btn primary" id="analyzeBtn">Analyze Dummy</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="grid">
+      <!-- LEFT: Upload + Scores -->
+      <section class="card">
+        <div class="head">
+          <div>
+            <div class="title">Upload Resume</div>
+            <div class="sub">PDF or DOCX • Drag & drop supported</div>
+          </div>
+          <div class="toolbar">
+            <button class="btn" id="clearBtn">Clear</button>
+            <label class="btn primary" for="file">Choose File</label>
+            <input type="file" id="file" accept=".pdf,.doc,.docx" />
+          </div>
+        </div>
+        <div class="body">
+          <div id="drop" class="uploader fade-in">
+            <div class="bigicon">📄</div>
+            <div style="font-weight:700; font-size:18px;">Drop your resume here</div>
+            <div class="name" id="fileName">No file selected</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- RIGHT: KPI quick stats -->
+      <section class="card">
+        <div class="head">
+          <div>
+            <div class="title">Quick Stats</div>
+            <div class="sub">Key indicators at a glance</div>
+          </div>
+        </div>
+        <div class="body">
+          <div class="kpis">
+            <div class="kpi"><span class="dot"></span><div><div class="val" id="kpiWords">—</div><div class="lbl">Total Words</div></div></div>
+            <div class="kpi"><span class="dot"></span><div><div class="val" id="kpiSections">—</div><div class="lbl">Sections Detected</div></div></div>
+            <div class="kpi"><span class="dot"></span><div><div class="val" id="kpiLinks">—</div><div class="lbl">Links / Contact</div></div></div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="grid" style="margin-top:22px; grid-template-columns: 1fr 1fr;">
+      <!-- ATS Score -->
+      <section class="card">
+        <div class="head">
+          <div>
+            <div class="title">ATS Score</div>
+            <div class="sub">Overall compatibility estimate</div>
+          </div>
+        </div>
+        <div class="body">
+          <div class="score-wrap">
+            <div class="ring" id="scoreRing" style="--p:0"><div class="inside" id="scoreVal">0</div></div>
+            <div class="legend">
+              <div class="row"><span class="badge">✔ Contact Info</span><span class="badge">✔ Skills</span></div>
+              <div class="row"><span class="badge">✔ Experience</span><span class="badge">✔ Education</span></div>
+              <div class="row"><span class="badge">• Keywords Match</span><span class="badge">• Formatting</span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Skill Match Bars -->
+      <section class="card">
+        <div class="head">
+          <div>
+            <div class="title">Skill Match</div>
+            <div class="sub">Against target role</div>
+          </div>
+        </div>
+        <div class="body">
+          <div class="bars" id="skillBars"></div>
+        </div>
+      </section>
+    </div>
+
+    <div class="grid" style="margin-top:22px; grid-template-columns: 1.2fr .8fr;">
+      <!-- Suggestions -->
+      <section class="card">
+        <div class="head">
+          <div>
+            <div class="title">Suggestions</div>
+            <div class="sub">Actionable improvements</div>
+          </div>
+          <button class="btn" id="downloadBtn">Download Report</button>
+        </div>
+        <div class="body">
+          <div class="tips" id="tips"></div>
+        </div>
+      </section>
+
+      <!-- Missing Keywords -->
+      <section class="card">
+        <div class="head">
+          <div>
+            <div class="title">Missing / Weak Keywords</div>
+            <div class="sub">Add these to improve matching</div>
+          </div>
+        </div>
+        <div class="body" id="keywords"></div>
+      </section>
+    </div>
+
+    <div class="footer">
+      <span>Demo only — no real AI processing. Connect your API later.</span>
+    </div>
+  </main>
+
+<script>
+// ======= Helper dummy data =======
+const DUMMY = {
+  score: 78,
+  words: 724,
+  sections: 6,
+  links: 3,
+  skills: [
+    { name: 'HTML/CSS', value: 92 },
+    { name: 'JavaScript', value: 85 },
+    { name: 'React', value: 74 },
+    { name: 'TypeScript', value: 61 },
+    { name: 'Accessibility', value: 58 },
+    { name: 'Testing/Jest', value: 45 },
+  ],
+  tips: [
+    { level: 'high', text: 'Quantify achievements (e.g., “Boosted page speed by 38%”).' },
+    { level: 'med', text: 'Add 4–6 role-specific keywords in Skills section.' },
+    { level: 'med', text: 'Include a 2–3 line professional summary at the top.' },
+    { level: 'low', text: 'Use consistent date formats (MMM YYYY – MMM YYYY).' },
+    { level: 'low', text: 'Compress PDF to keep under 2 MB.' },
+  ],
+  keywords: [ 'Performance', 'SEO', 'Unit Testing', 'TypeScript', 'WCAG', 'Figma' ]
+};
+
+// ======= Elements =======
+const fileInput = document.getElementById('file');
+const drop = document.getElementById('drop');
+const fileName = document.getElementById('fileName');
+const analyzeBtn = document.getElementById('analyzeBtn');
+const clearBtn = document.getElementById('clearBtn');
+const toggleTheme = document.getElementById('toggleTheme');
+const kpiWords = document.getElementById('kpiWords');
+const kpiSections = document.getElementById('kpiSections');
+const kpiLinks = document.getElementById('kpiLinks');
+const scoreRing = document.getElementById('scoreRing');
+const scoreVal = document.getElementById('scoreVal');
+const skillBars = document.getElementById('skillBars');
+const tipsWrap = document.getElementById('tips');
+const keywordsWrap = document.getElementById('keywords');
+const downloadBtn = document.getElementById('downloadBtn');
+
+// ======= Uploader interactions (UI only) =======
+['dragenter','dragover'].forEach(ev=> drop.addEventListener(ev, e=>{ e.preventDefault(); drop.classList.add('drag'); }));
+['dragleave','drop'].forEach(ev=> drop.addEventListener(ev, e=>{ e.preventDefault(); drop.classList.remove('drag'); }));
+drop.addEventListener('drop', (e)=>{
+  const f = e.dataTransfer.files?.[0];
+  if(f){ fileName.textContent = f.name; }
+});
+fileInput.addEventListener('change', (e)=>{
+  const f = e.target.files?.[0];
+  fileName.textContent = f ? f.name : 'No file selected';
+});
+clearBtn.addEventListener('click', ()=>{
+  fileInput.value = '';
+  fileName.textContent = 'No file selected';
+});
+
+// ======= Render functions =======
+function animateScore(n){
+  const target = Math.max(0, Math.min(100, n|0));
+  scoreRing.classList.remove('bad','warn');
+  if(target < 60) scoreRing.classList.add('bad');
+  else if(target < 80) scoreRing.classList.add('warn');
+  let p = 0; scoreVal.textContent = '0'; scoreRing.style.setProperty('--p', 0);
+  const step = ()=>{
+    p += Math.max(1, Math.round((target - p)/10));
+    if(p > target) p = target;
+    scoreRing.style.setProperty('--p', p);
+    scoreVal.textContent = String(p);
+    if(p < target) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+
+function renderKpis({words, sections, links}){
+  kpiWords.textContent = words;
+  kpiSections.textContent = sections;
+  kpiLinks.textContent = links;
+}
+
+function renderSkills(items){
+  skillBars.innerHTML = '';
+  items.forEach(({name, value})=>{
+    const row = document.createElement('div');
+    row.className = 'bar fade-in';
+    row.innerHTML = `
+      <div class="top"><span>${name}</span><strong>${value}%</strong></div>
+      <div class="track"><div class="fill"></div></div>
+    `;
+    skillBars.appendChild(row);
+    // animate fill after append
+    requestAnimationFrame(()=>{
+      row.querySelector('.fill').style.width = value + '%';
+    });
+  });
+}
+
+function renderTips(list){
+  tipsWrap.innerHTML = '';
+  list.forEach(({level, text})=>{
+    const el = document.createElement('div');
+    el.className = 'tip fade-in';
+    el.innerHTML = `
+      <div class="tag ${level}">${level.toUpperCase()} PRIORITY</div>
+      <div style="font-weight:600">${text}</div>
+    `;
+    tipsWrap.appendChild(el);
+  });
+}
+
+function renderKeywords(words){
+  keywordsWrap.innerHTML = '';
+  words.forEach((w,i)=>{
+    const lvl = i < 2 ? 'high' : i < 4 ? 'med' : 'low';
+    const pill = document.createElement('span');
+    pill.className = `pill ${lvl} fade-in`;
+    pill.textContent = w;
+    keywordsWrap.appendChild(pill);
+  });
+}
+
+// ======= Download report (dummy) =======
+function downloadReport(){
+  const data = {
+    generatedAt: new Date().toISOString(),
+    file: fileName.textContent,
+    score: DUMMY.score,
+    kpis: { words: DUMMY.words, sections: DUMMY.sections, links: DUMMY.links },
+    skills: DUMMY.skills,
+    tips: DUMMY.tips,
+    keywords: DUMMY.keywords
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'resume-report.json'; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ======= Theme toggle (subtle) =======
+let dark = true;
+toggleTheme.addEventListener('click', ()=>{
+  dark = !dark;
+  document.documentElement.style.setProperty('--bg', dark? '#0b1020' : '#f6f8ff');
+  document.documentElement.style.setProperty('--panel', dark? '#0f1530' : '#ffffff');
+  document.documentElement.style.setProperty('--text', dark? '#eaf0ff' : '#0b1020');
+  document.documentElement.style.setProperty('--muted', dark? '#586aa9' : '#3b4b7a');
+});
+
+// ======= Analyze (fills dummy data) =======
+analyzeBtn.addEventListener('click', ()=>{
+  animateScore(DUMMY.score);
+  renderKpis({words:DUMMY.words, sections:DUMMY.sections, links:DUMMY.links});
+  renderSkills(DUMMY.skills);
+  renderTips(DUMMY.tips);
+  renderKeywords(DUMMY.keywords);
+  analyzeBtn.textContent = 'Analyzed ✔';
+  setTimeout(()=> analyzeBtn.textContent = 'Analyze Again', 1200);
+});
+
+downloadBtn.addEventListener('click', downloadReport);
+
+// Auto-run once for preview
+window.addEventListener('DOMContentLoaded', ()=> analyzeBtn.click());
+</script>
+</body>
+</html>
